@@ -46,7 +46,7 @@ class TrackerBalancedLoss:
             Dict[str:Any]: Dictionary of evaluated results. The keys will match
             those provided in the multi_loss parameter
         """
-        loss = 0
+        loss = torch.tensor([])
         _metric_value_dict = {}
         for key in self.loss_lkp.keys():
             _loss = self.loss_lkp[key](pred[key], act[key])
@@ -54,7 +54,7 @@ class TrackerBalancedLoss:
                 "label":f"step_{self.__step}",
                 "value":_loss
             }
-            loss += _loss
+            loss = torch.cat((loss, torch.tensor([_loss])), dim=0)
         if self.mo is not None:
             self.mo.update_metrics(metric_value_dict=_metric_value_dict)
         out_loss = torch.mean(loss)
