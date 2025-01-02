@@ -140,7 +140,7 @@ def train(
             "epoch_train_loss":{"label":"epoch_{}".format(epoch),
                                 "value":epoch_train_loss},
             "epoch_val_loss":{"label":"epoch_{}".format(epoch),
-                            "value":epoch_val_loss}
+                            "value":epoch_val_loss},
             "epoch_train_accuracy":{"label":"epoch_{}".format(epoch),
                                 "value":train_accuracy},
             "epoch_val_accuracy":{"label":"epoch_{}".format(epoch),
