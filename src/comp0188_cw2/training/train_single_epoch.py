@@ -55,7 +55,7 @@ class TrainSingleEpoch:
         optimizer:torch.optim.Optimizer,
         criterion:CriterionProtocol,
         logger:logging.Logger,
-        accuracy:Bool = False
+        accuracy:bool = False
         )->Tuple[torch.Tensor, Dict[str,torch.Tensor]]:
         """ Call function which runs a single epoch of training
         Args:
