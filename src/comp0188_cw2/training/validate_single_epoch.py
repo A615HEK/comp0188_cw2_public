@@ -26,12 +26,32 @@ class ValidateSingleEpoch:
         self.half_precision = half_precision
         self.cache_preds = cache_preds
 
+    def calculate_accuracy(predictions, targets):
+        """
+        Calculating accuracy using PyTorch functions.
+
+        Args:
+            predictions (torch.Tensor): Raw model outputs (logits) of shape [batch_size, num_classes]
+            targets (torch.Tensor): Ground truth labels of shape [batch_size]
+
+        Returns:
+            accuracy (float): The accuracy as a percentage.
+        """
+        # Getting the predicted class (index of max logit) for each sample
+        predicted_classes = torch.argmax(predictions, dim=1)
+        # Counting the number of correct predictions
+        correct_predictions = (predicted_classes == targets).sum()
+        # Calculation of accuracy as percentage
+        accuracy_value = (correct_predictions.item() / targets.size(0)) * 100
+        return accuracy_value
+
     def __call__(
         self,
         model:torch.nn.Module,
         data_loader:GenericDataLoaderProtocol,
         gpu:bool,
-        criterion:CriterionProtocol
+        criterion:CriterionProtocol,
+        accuracy: bool = False
         )->Tuple[torch.Tensor, Dict[str,torch.Tensor]]:
         """ Call function which runs a single epoch of validation
         Args:
@@ -51,6 +71,7 @@ class ValidateSingleEpoch:
 
         losses = torch.tensor(0)
         denom = torch.tensor(0)
+        accuracy_val = torch.tensor(0)
         if gpu:
             _device = "cuda"
         else:
@@ -59,6 +80,7 @@ class ValidateSingleEpoch:
         if self.half_precision:
             losses = losses.half()
             denom = denom.half()
+            accuracy_val = accuracy_val.half()
         model.eval()
         preds = []
         with torch.no_grad():
@@ -89,6 +111,10 @@ class ValidateSingleEpoch:
                 else:
                     output = model(**input_vals)
 
+                if accuracy:
+                    accuracy_value = self.calculate_accuracy(output, output_vals)
+                    accuracy_val += accuracy_value
+
                 # Logs
                 val_loss = criterion(output, output_vals)
                 losses += val_loss.detach().cpu()
@@ -100,4 +126,4 @@ class ValidateSingleEpoch:
             for k in preds[0].keys():
                 _prd_lst[k] = torch.concat([t[k] for t in preds],dim=0)
         losses = losses/denom
-        return losses, _prd_lst
+        return losses, _prd_lst, accuracy_val/denom
