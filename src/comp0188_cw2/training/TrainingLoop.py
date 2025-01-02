@@ -33,6 +33,7 @@ def train(
     val_epoch_func:ValidateSingleEpochProtocol = ValidateSingleEpoch(),
     seed: int = None,
     mo: WandBMetricOrchestrator = WandBMetricOrchestrator(),
+    accuracy: bool = False
     val_criterion:Optional[CriterionProtocol] = None,
     preds_save_type:Optional[Literal["pickle","csv"]] = None,
     output_dir:Optional[str] = None
@@ -56,6 +57,8 @@ def train(
         mo (WandBMetricOrchestrator, optional): Metric Orchestrator to use. 
         This abstracts logging to weights and biases away from the training 
         loop. Defaults to None.
+        accuracy (bool, optional): Boolean indicating whether to calculate accuracy.
+        Defaults to False.
         val_criterion (CriterionProtocol, optional): Criterian to use for 
         validation. If this is None, then the same criterion for training 
         will be used. Defaults to None.
@@ -104,27 +107,36 @@ def train(
 
     for epoch in np.arange(1,epochs+1):
         logger.info("Running training epoch")
-        train_loss_val, train_preds =  train_epoch_func(
+        train_loss_val, train_preds, train_accuracy =  train_epoch_func(
             model=model, data_loader=train_data_loader, gpu=gpu,
-            optimizer=optimizer, criterion=criterion,logger=logger)
+            optimizer=optimizer, criterion=criterion,logger=logger,
+            accuracy=accuracy)
         epoch_train_loss = train_loss_val.numpy()
 
         logger.info("epoch {}\t training loss : {}".format(
                 epoch, epoch_train_loss))
-        val_loss_val, val_preds = val_epoch_func(
+        logger.info("epoch {}\t training accuracy : {}".format(
+                epoch, train_accuracy))
+        val_loss_val, val_preds, val_accuracy = val_epoch_func(
             model=model, data_loader=val_data_loader, gpu=gpu,
-            criterion=val_criterion)
+            criterion=val_criterion, accuracy=accuracy)
 
         epoch_val_loss = val_loss_val.numpy()
         logger.info("Running validation")
         logger.info("epoch {}\t validation loss : {} ".format(
                 epoch, epoch_val_loss))
+        logger.info("epoch {}\t validation accuracy : {} ".format(
+                  epoch, val_accuracy))
 
         mo.update_metrics(metric_value_dict={
             "epoch_train_loss":{"label":"epoch_{}".format(epoch),
                                 "value":epoch_train_loss},
             "epoch_val_loss":{"label":"epoch_{}".format(epoch),
                             "value":epoch_val_loss}
+            "epoch_train_accuracy":{"label":"epoch_{}".format(epoch),
+                                "value":train_accuracy},
+            "epoch_val_accuracy":{"label":"epoch_{}".format(epoch),
+                            "value":val_accuracy}
         })
 
         if scheduler:
@@ -261,7 +273,8 @@ class TorchTrainingLoop:
         wandb_name:Optional[str] = None,
         wandb_grp:Optional[str] = None,
         reset_kwargs:Optional[Dict[str,Any]] = {},
-        reset_model:bool = True
+        reset_model:bool = True,
+        accuracy:bool = False
         ) -> WandBMetricOrchestrator:
       wandb.init(
           project=wandb_proj,
@@ -301,7 +314,8 @@ class TorchTrainingLoop:
           cache_preds=self.cache_preds
           ),
         preds_save_type = self.preds_save_type,
-        output_dir=self.output_dir
+        output_dir=self.output_dir,
+        accuracy=accuracy
       )
       chckpnt_files = [f for f in os.listdir(chkpnt_dh.loc) if f[-3:]==".pt"]
       for i in chckpnt_files:
