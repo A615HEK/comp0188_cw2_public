@@ -35,7 +35,8 @@ class TrainSingleEpoch:
         gpu:bool,
         optimizer:torch.optim.Optimizer,
         criterion:CriterionProtocol,
-        logger:logging.Logger
+        logger:logging.Logger,
+        accuracy:Bool = False
         )->Tuple[torch.Tensor, Dict[str,torch.Tensor]]:
         """ Call function which runs a single epoch of training
         Args:
@@ -96,17 +97,19 @@ class TrainSingleEpoch:
             # Compute output
             if self.half_precision:
                 with torch.autocast(device_type=_device):
-                        output = model(**input_vals)
-                        train_loss = criterion(output, output_vals)
+                    output = model(**input_vals)
+                    if accuracy:
+                        accuracy_val = calculate_accuracy(output, output_vals)
+                    train_loss = criterion(output, output_vals)
             else:
                 output = model(**input_vals)
+                if accuracy:
+                    accuracy_val = calculate_accuracy(output, output_vals)
                 train_loss = criterion(output, output_vals)
             if self.cache_preds:
                 preds.append({k:output[k].detach().cpu() for k in output.keys()})
             losses += train_loss.detach().cpu()
             denom += 1
-            # losses.update(train_loss.data[0], g.size(0))
-            # error_ratio.update(evaluation(output, target).data[0], g.size(0))
 
             try:
                 # compute gradient and do SGD step
