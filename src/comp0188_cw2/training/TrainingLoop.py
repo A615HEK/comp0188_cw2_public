@@ -33,7 +33,9 @@ def train(
     val_epoch_func:ValidateSingleEpochProtocol = ValidateSingleEpoch(),
     seed: int = None,
     mo: WandBMetricOrchestrator = WandBMetricOrchestrator(),
-    accuracy: bool = False
+    accuracy: bool = False,
+    early_stopping: bool = False,
+    e_stop_patience: int = 4,
     val_criterion:Optional[CriterionProtocol] = None,
     preds_save_type:Optional[Literal["pickle","csv"]] = None,
     output_dir:Optional[str] = None
@@ -59,6 +61,11 @@ def train(
         loop. Defaults to None.
         accuracy (bool, optional): Boolean indicating whether to calculate accuracy.
         Defaults to False.
+        early_stopping (bool, optional): Boolean indicating whether to use early stopping
+        or not. Defaults to False.
+        e_stop_patience (int, optional): Integer representing the number of epochs
+        after which to break the training loop if no improvement in validation loss
+        occurs. Defaults to 4. Only used if early_stopping is set to True.
         val_criterion (CriterionProtocol, optional): Criterian to use for 
         validation. If this is None, then the same criterion for training 
         will be used. Defaults to None.
@@ -104,7 +111,8 @@ def train(
     if val_criterion is None:
         val_criterion = criterion
 
-
+    best_val_loss = float("inf")
+    patience_counter = 0
     for epoch in np.arange(1,epochs+1):
         logger.info("Running training epoch")
         train_loss_val, train_preds, train_accuracy =  train_epoch_func(
@@ -151,6 +159,17 @@ def train(
                 'optimizer_state_dict': optimizer.state_dict(),
                 'loss': epoch_train_loss,
             }, chkp_pth)
+
+        if early_stopping:
+            if epoch_val_loss < best_val_loss:
+                best_val_loss = epoch_val_loss
+                patience_counter = 0
+                torch.save(model.state_dict(), "best_model.pth")
+            else:
+                patience_counter += 1
+                if patience_counter >= e_stop_patience:
+                    print(f"Early stopping at epoch {epoch}")
+                    break
 
         if preds_save_type is not None:
             if preds_save_type == "pickle":
