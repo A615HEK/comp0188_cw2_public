@@ -112,8 +112,7 @@ class ValidateSingleEpoch:
                     output = model(**input_vals)
 
                 if accuracy:
-                    accuracy_value = self.calculate_accuracy(output, output_vals)
-                    accuracy_val += accuracy_value
+                    accuracy_val += self.calculate_accuracy(output, output_vals)
 
                 # Logs
                 val_loss = criterion(output, output_vals)
