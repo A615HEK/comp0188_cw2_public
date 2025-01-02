@@ -27,7 +27,26 @@ class TrainSingleEpoch:
         """
         self.half_precision = half_precision
         self.cache_preds = cache_preds
-        
+
+    def calculate_accuracy(predictions, targets):
+        """
+        Calculating accuracy using PyTorch functions.
+
+        Args:
+            predictions (torch.Tensor): Raw model outputs (logits) of shape [batch_size, num_classes]
+            targets (torch.Tensor): Ground truth labels of shape [batch_size]
+
+        Returns:
+            accuracy (float): The accuracy as a percentage.
+        """
+        # Getting the predicted class (index of max logit) for each sample
+        predicted_classes = torch.argmax(predictions, dim=1)
+        # Counting the number of correct predictions
+        correct_predictions = (predicted_classes == targets).sum()
+        # Calculation of accuracy as percentage
+        accuracy_value = (correct_predictions.item() / targets.size(0)) * 100
+        return accuracy_value
+
     def __call__(
         self,
         model:torch.nn.Module,
@@ -60,6 +79,7 @@ class TrainSingleEpoch:
         """
         losses = torch.tensor(0)
         denom = torch.tensor(0)
+        accuracy_val = torch.tensor(0)
         if gpu:
             _device = "cuda"
         else:
@@ -68,6 +88,7 @@ class TrainSingleEpoch:
         if self.half_precision:
             losses = losses.half()
             denom = denom.half()
+            accuracy_val = accuracy_val.half()
         model.train()
         
         preds = []
@@ -99,12 +120,12 @@ class TrainSingleEpoch:
                 with torch.autocast(device_type=_device):
                     output = model(**input_vals)
                     if accuracy:
-                        accuracy_val = calculate_accuracy(output, output_vals)
+                        accuracy_val += self.calculate_accuracy(output, output_vals)
                     train_loss = criterion(output, output_vals)
             else:
                 output = model(**input_vals)
                 if accuracy:
-                    accuracy_val = calculate_accuracy(output, output_vals)
+                    accuracy_val += self.calculate_accuracy(output, output_vals)
                 train_loss = criterion(output, output_vals)
             if self.cache_preds:
                 preds.append({k:output[k].detach().cpu() for k in output.keys()})
@@ -124,4 +145,4 @@ class TrainSingleEpoch:
             for k in preds[0].keys():
                 _prd_lst[k] = torch.concat([t[k] for t in preds],dim=0)
         losses = losses/denom
-        return losses, _prd_lst
+        return losses, _prd_lst, accuracy_val/denom
